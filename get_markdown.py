@@ -4,6 +4,7 @@ import re
 import math
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
+from sklearn.metrics import classification_report, confusion_matrix
 
 mode = 'NORMAL'
 
@@ -29,6 +30,59 @@ class Excel_to_markdown():
     @staticmethod
     def color_distance(c1, c2):
         return math.sqrt(sum((e1 - e2) ** 2 for e1, e2 in zip(c1, c2)))
+    
+    @staticmethod
+    def get_table_as_array(md_content):
+        lines = md_content.strip().split("\n")
+        table = []
+        
+        for line in lines:
+            if line.startswith("|---"):  # Skip the separator line
+                continue
+            
+            row = [cell.strip() for cell in line.split("|") if cell.strip()]
+            table.append(row)
+        return table
+
+    @staticmethod
+    def get_trim_markdown_table(md_content, output_range):
+        """ 
+        Get the trimmed markdown table
+        md_content: Markdown table content
+        Output range: [start_row_idx, end_row_idx, start_col_idx, end_col_idx]
+        """
+        table = Excel_to_markdown.get_table_as_array(md_content)
+        row_range = output_range[:2]
+        col_range = output_range[2:]
+        for r_idx, r in enumerate(table):
+            if r_idx < row_range[0] or r_idx > row_range[1]:
+                continue
+            for c_idx, cell in enumerate(r):
+                if c_idx < col_range[0] or c_idx > col_range[1]:
+                    continue
+                md_content += f"|{cell}"
+            md_content += "|\n"
+        return md_content
+        
+    @staticmethod
+    def evaluate_markdown_table(md_pred, md_label):
+        """ 
+        Evaluate the predicted markdown table
+        """
+        pred_table = Excel_to_markdown.get_table_as_array(md_pred)
+        label_table = Excel_to_markdown.get_table_as_array(md_label)
+        num_rows = len(pred_table)
+        num_cols = len(pred_table[0])
+        
+        if num_rows != len(label_table) or num_cols != len(label_table[0]):
+            raise ValueError("The number of rows or columns in the predicted table does not match the label table.")
+        
+        preds = [j for i in pred_table for j in i]
+        labels = [j for i in label_table for j in i]
+        report = classification_report(labels, preds, output_dict=True)
+        confusion = confusion_matrix(labels, preds)
+        return report, confusion
+
 
     # Find the nearest color
     def find_nearest_color(target_rgb):
@@ -183,7 +237,7 @@ class Excel_to_markdown():
                     min_row_b <= max_row_a <= max_row_b)
         return is_within
 
-    def convert_table_to_markdown(self, file_name, sheet, range, out_type, merge_strategy='duplicate', get_label=False):
+    def convert_table_to_markdown(self, file_name, sheet, range, out_type, merge_strategy='duplicate', get_label=False, output_range=[]):
         """
         file_name: name of file
         sheet: sheet name / sheet idx
@@ -191,6 +245,8 @@ class Excel_to_markdown():
         out_type: html or markdown
 
         merge_strategy: duplicate or ignore
+        output_range: Specific the range to export markdown, e.g., [1,3,2,5] as start_row_idx, end_row_idx, start_col_idx, end_col_idx (include last row/col)
+        Why use output_range: Avoid rows/cols eliminated due to the None values
         """
         self.merge_strategy = merge_strategy
         self.get_label = get_label
@@ -255,19 +311,33 @@ class Excel_to_markdown():
             print(duplicate_row_idx)
             print(duplicate_col_idx)
 
+        # Define output range
+        if len(output_range) == 0:
+            row_range = 0, 999999
+            col_range = 0, 999999
+        else:
+            row_range = [output_range[0], output_range[1]]
+            col_range = [output_range[2], output_range[3]]
         # Handle as markdown
         if out_type=='markdown':
             md_content = ""
             header = True
+            r_count = 0
             for r_idx, r in enumerate(cell_range):
                 if r_idx in duplicate_row_idx:
                     continue
-                if header and r_idx >=1:
-                    md_content += "|---" * (len(r)- len(duplicate_col_idx)) + "|\n"
-                    header = False
+                if r_count < row_range[0] or r_count > row_range[1]:
+                    r_count += 1
+                    continue
+                r_count += 1
+                c_count = 0
                 for c_idx, cell in enumerate(r):
                     if c_idx in duplicate_col_idx:
                         continue
+                    if c_count < col_range[0] or c_count > col_range[1]:
+                        c_count += 1
+                        continue
+                    c_count += 1
                     # print(cell.coordinate)
                     md_content += f"|{self.get_value(cell, merge_cell_values, {})}"
                 md_content += "|\n"
