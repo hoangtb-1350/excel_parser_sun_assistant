@@ -7,6 +7,7 @@ from openpyxl.utils import range_boundaries
 from sklearn.metrics import classification_report, confusion_matrix
 
 mode = 'NORMAL'
+table_labels = ['HEADER', 'ATTRIBUTE', 'DATA', 'NONE']
 
 class Excel_to_markdown():
     # Predefined color dictionary (add more as needed)
@@ -79,8 +80,8 @@ class Excel_to_markdown():
         
         preds = [j for i in pred_table for j in i]
         labels = [j for i in label_table for j in i]
-        report = classification_report(labels, preds, output_dict=True)
-        confusion = confusion_matrix(labels, preds)
+        report = classification_report(labels, preds, output_dict=True, labels=table_labels)
+        confusion = confusion_matrix(labels, preds, labels=table_labels)
         return report, confusion
 
 
@@ -237,16 +238,23 @@ class Excel_to_markdown():
                     min_row_b <= max_row_a <= max_row_b)
         return is_within
 
-    def convert_table_to_markdown(self, file_name, sheet, range, out_type, merge_strategy='duplicate', get_label=False, output_range=[]):
-        """
-        file_name: name of file
-        sheet: sheet name / sheet idx
-        range: range of table, e.g. 'A1:C5'
-        out_type: html or markdown
+    def convert_table_to_markdown(self, file_name, sheet, range, out_type, merge_strategy='duplicate', get_label=False, output_range=[], max_sentences = False, max_token = False):
+        """        
+        Converts a specified range of an Excel sheet to markdown or HTML format.
 
-        merge_strategy: duplicate or ignore
-        output_range: Specific the range to export markdown, e.g., [1,3,2,5] as start_row_idx, end_row_idx, start_col_idx, end_col_idx (include last row/col)
-        Why use output_range: Avoid rows/cols eliminated due to the None values
+        Parameters:
+        file_name (str): The name of the Excel file.
+        sheet (str or int): The sheet name or index.
+        range (str): The range of the table to convert, e.g., 'A1:C5'.
+        out_type (str): The output type, either 'html' or 'markdown'.
+        merge_strategy (str, optional): Strategy for handling merged cells, either 'duplicate' or 'ignore'. Default is 'duplicate'.
+        get_label (bool, optional): Whether to get labels. Default is False.
+        output_range (list, optional): Specific range to export markdown, e.g., [1,3,2,5] as start_row_idx, end_row_idx, start_col_idx, end_col_idx (inclusive). Default is an empty list.
+        max_sentences (int | bool, optional): Maximum number of sentences. Default is False as no restriction.
+        max_token (int | bool, optional): Maximum number of tokens. Default is False as no restriction.
+
+        Returns:
+        str: The converted table in markdown or HTML format.
         """
         self.merge_strategy = merge_strategy
         self.get_label = get_label
@@ -343,6 +351,18 @@ class Excel_to_markdown():
                 md_content += "|\n"
             return md_content
 
+def flatten_dict(nested_dict):
+    result = {}
 
+    def helper(current_dict, key_prefix):
+        for key, value in current_dict.items():
+            new_key = f"{key_prefix}{key}" if key_prefix else key
+            if isinstance(value, dict):
+                helper(value, new_key + ".")
+            else:
+                result[new_key] = value
+
+    helper(nested_dict, "")
+    return result
 
 
