@@ -20,7 +20,7 @@ result_worksheet = gc.open(SHEET_FILE_NAME).worksheet(TEST_SHEET_NAME)
 model_call = AnswerGenerator()
 all_rows = result_worksheet.get_all_values()
 
-for i in range(9,len(all_rows)):
+for i in range(START_ROW_IDX,len(all_rows)):
     # check F{i+1} filled
     if len(all_rows[i]) > 5 and all_rows[i][5] != '':
         continue

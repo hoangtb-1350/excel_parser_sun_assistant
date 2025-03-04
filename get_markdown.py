@@ -5,6 +5,7 @@ import math
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
 from sklearn.metrics import classification_report, confusion_matrix
+import tiktoken
 
 mode = 'NORMAL'
 table_labels = ['HEADER', 'ATTRIBUTE', 'DATA', 'NONE']
@@ -84,7 +85,16 @@ class Excel_to_markdown():
         confusion = confusion_matrix(labels, preds, labels=table_labels)
         return report, confusion
 
-
+    @staticmethod
+    def count_tokens(input_text: str) -> int:
+        # Initialize the tokenizer for the 'gpt-4' model
+        encoder = tiktoken.encoding_for_model("gpt-4")
+        
+        # Encode the input text and count the tokens
+        token_ids = encoder.encode(input_text)
+        token_count = len(token_ids)
+        
+        return token_count
     # Find the nearest color
     def find_nearest_color(target_rgb):
         target_rgb = tuple(int(target_rgb[i:i+2], 16) for i in (0, 2, 4))
@@ -218,12 +228,29 @@ class Excel_to_markdown():
             if value == "":
                 return "NONE"
             else:
-                return "DATA"
+                return "DATA" if not self.exclude_data_label else " "
 
         if value == "":
             return " "
-        return value.replace("\n", "<br>")
+        value = value.replace("\n", "<br>")
+        if self.max_sentences:
+            value = ".".join(value.split(".")[:self.max_sentences])
+        if self.max_token:
+            value = " ".join(self.tokenize_string(value)[:self.max_token])
+        return value
 
+    def tokenize_string(self, input_text: str) -> list:
+        # Initialize the tokenizer for the 'gpt-4' model
+        encoder = tiktoken.encoding_for_model("gpt-4o")
+        
+        # Encode the input text to get the token IDs
+        token_ids = encoder.encode(input_text)
+        
+        # Decode the token IDs to get the actual tokens
+        tokens = encoder.decode(token_ids).split()  # Split by whitespace to get individual tokens
+        
+        return tokens
+    
     def check_in_range(self, range_a, range_b):
         """
         True if range_a completely in range_b
@@ -238,7 +265,7 @@ class Excel_to_markdown():
                     min_row_b <= max_row_a <= max_row_b)
         return is_within
 
-    def convert_table_to_markdown(self, file_name, sheet, range, out_type, merge_strategy='duplicate', get_label=False, output_range=[], max_sentences = False, max_token = False):
+    def convert_table_to_markdown(self, file_name, sheet, range, out_type, merge_strategy='duplicate', get_label=False, output_range=[], max_sentences = False, max_token = False, exclude_data_label=False):
         """        
         Converts a specified range of an Excel sheet to markdown or HTML format.
 
@@ -252,12 +279,15 @@ class Excel_to_markdown():
         output_range (list, optional): Specific range to export markdown, e.g., [1,3,2,5] as start_row_idx, end_row_idx, start_col_idx, end_col_idx (inclusive). Default is an empty list.
         max_sentences (int | bool, optional): Maximum number of sentences. Default is False as no restriction.
         max_token (int | bool, optional): Maximum number of tokens. Default is False as no restriction.
-
+        exclude_data_label (bool): exclude DATA | NONE label. Default is False.
         Returns:
         str: The converted table in markdown or HTML format.
         """
         self.merge_strategy = merge_strategy
         self.get_label = get_label
+        self.max_sentences = max_sentences
+        self.max_token = max_token
+        self.exclude_data_label = exclude_data_label
         # Find rows, cols number
         self.wb = load_workbook(file_name, data_only=True)
         self.no_compile_wb = load_workbook(file_name, data_only=False)
