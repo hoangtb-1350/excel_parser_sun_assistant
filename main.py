@@ -7,12 +7,14 @@ auth.authenticate_user()
 
 import gspread
 from google.auth import default
+import os
 creds, _ = default()
 
-START_ROW_IDX=2 # Count from 0
-SHEET_FILE_NAME = 'Report cell classification'
-SAMPLE_SHEET_NAME = 'Hoang_FewshotSamples'
-TEST_SHEET_NAME = 'Hoang_FewshotTests'
+START_ROW_IDX = int(os.getenv('START_ROW_IDX', 2)) # Count from 0
+SHEET_FILE_NAME = os.getenv('SHEET_FILE_NAME', 'Report cell classification')
+SAMPLE_SHEET_NAME = os.getenv('SAMPLE_SHEET_NAME', 'Hoang_FewshotSamples')
+TEST_SHEET_NAME = os.getenv('TEST_SHEET_NAME', 'Hoang_FewshotTests')
+
 gc = gspread.authorize(creds)
 worksheet = gc.open(SHEET_FILE_NAME).worksheet(SAMPLE_SHEET_NAME)
 result_worksheet = gc.open(SHEET_FILE_NAME).worksheet(TEST_SHEET_NAME)
