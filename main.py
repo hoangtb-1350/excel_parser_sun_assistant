@@ -2,9 +2,6 @@ from get_markdown import *
 from prompt import FEW_SHOT_PROMPT
 from llm import *
 
-from google.colab import auth
-auth.authenticate_user()
-
 import gspread
 from google.auth import default
 import os
